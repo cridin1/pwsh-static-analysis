@@ -1,5 +1,5 @@
 # pwsh-gen
-Python NLP wrapper for powershell syntax analysis through PSScript Analyzer
+Python NLP wrapper for powershell syntax analysis through PSScript Analyzer. Make sure you have installed [PSScript Analyzer](https://github.com/PowerShell/PSScriptAnalyzer).
 
 ```bash
 PS > python .\script.py -h
