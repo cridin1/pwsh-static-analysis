@@ -30,7 +30,7 @@ def parse_output(answer) -> []:
         f.write(answer)
     f.close()
 
-    result = subprocess.run(f'powershell.exe .\parser.ps1 buffer.ps1', stdout=subprocess.PIPE, text=True)
+    result = subprocess.run(f'pwsh .\parser.ps1 buffer.ps1', stdout=subprocess.PIPE, text=True)
     result = result.stdout.strip().split("--")
     result = [elem.strip("|").strip().strip("|") for elem in result]
 
