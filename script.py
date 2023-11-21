@@ -3,25 +3,32 @@ import os,ast,subprocess,argparse
 import logging as lg
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
-def extract_dataframe(des_path,answer_path, ground_truth) -> pd.DataFrame:
+def extract_dataframe(des_path,answer_path, ground_truth="") -> pd.DataFrame:
     with open(des_path, 'r') as f:
         list_des = [elem.strip() for elem in f.readlines()]
     f.close()
     lg.debug("Extracted descriptions: " + str(len(list_des)))
 
     with open(answer_path, 'r') as f:
-        list_answer = ast.literal_eval(f.read())
+        #list_answer = ast.literal_eval(f.read())
+        list_answer = [elem.strip() for elem in f.readlines()]
     f.close()
     lg.debug("Extracted answers: " + str(len(list_answer)))
 
-    with open(ground_truth, 'r') as f:
-        list_truth = [elem.strip() for elem in f.readlines()]
-    f.close()
-    lg.debug("Extracted truth: "+ str(len(list_truth)))
+    if(ground_truth != ""):
+        with open(ground_truth, 'r') as f:
+            list_truth = [elem.strip() for elem in f.readlines()]
+        f.close()
+        lg.debug("Extracted truth: "+ str(len(list_truth)))
 
-    df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer, 'Ground Truth': list_truth})
-    lg.debug("Created dataframe: ")
-    return df
+        df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer, 'Ground Truth': list_truth})
+        lg.debug("Created dataframe: ")
+        return df
+    else:
+        df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer})
+        lg.debug("Created dataframe: ")
+        return df
+
 
 def parse_output(answer) -> []:
     lg.debug(answer)
@@ -42,7 +49,7 @@ def parse_output(answer) -> []:
     lg.debug(result)
     return result
 
-def add_results(df,FILE_CSV) -> pd.DataFrame:
+def add_results_compare(df,FILE_CSV) -> pd.DataFrame:
     l = df.shape[0]
     for i,row in df.iterrows():
         if(i>=N):
@@ -68,15 +75,37 @@ def add_results(df,FILE_CSV) -> pd.DataFrame:
 
     return df_out
 
+def add_results_single(df,FILE_CSV) -> pd.DataFrame:
+    l = df.shape[0]
+    for i,row in df.iterrows():
+        if(i>=N):
+            answer = row['Answer']
+            answer_out = parse_output(answer)
+
+            if(answer_out == ['']):
+                answer_out = ['','','']
+
+            lg.info(f"It: {i+1}/{l} Len_ans_out: {len(answer_out)}")
+            
+            try:
+                df_partial.loc[len(df_partial.index)] = [answer] + answer_out
+            finally:
+                df_partial.to_csv(FILE_CSV, index=False)
+
+    df_out = pd.concat([df,df_partial], axis = 1)
+    os.remove("buffer.ps1")
+
+    return df_out
+
 if __name__ == '__main__':
  
     parser = argparse.ArgumentParser(description="Python NLP wrapper for powershell syntax analysis through PSScript Analyzer")
     parser.add_argument("DESCRIPTION_PATH", help="Description text file path from the model")
     parser.add_argument("ANSWER_PATH", help="Answers text file path from the model")
-    parser.add_argument("GROUND_TRUTH", help="Ground truth text file path")
-    parser.add_argument("OUT_FILE", help="Output csv file")
+    parser.add_argument("GROUND_TRUTH", help="Ground truth text file path",nargs='?',  default="")
+    parser.add_argument("OUT_FILE", help="Output csv file", nargs='?',const="output.csv")
     parser.add_argument("-v","--verbose", help="Verbose", nargs='?', type=int, const=1, default=0)
-
+    
     args = parser.parse_args()
     
     DESCRIPTION_PATH = args.DESCRIPTION_PATH
@@ -85,7 +114,7 @@ if __name__ == '__main__':
     FILE_CSV = "output_partial.csv"
     OUT_FILE = args.OUT_FILE
     VERBOSE = args.verbose
-
+    
     if(VERBOSE):
         lg.getLogger().setLevel(lg.DEBUG)
         lg.debug(vars(args))
@@ -93,15 +122,26 @@ if __name__ == '__main__':
         lg.getLogger().setLevel(lg.INFO)
 
     N = 0
-    if((os.path.exists(FILE_CSV))):
-        df_partial = pd.read_csv(FILE_CSV)
-        N = df_partial.shape[0]
-    else:
-        df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity',
-                                "TRUTH Rulename",'TRUTH Message','TRUTH Severity'])
     
-    df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH,GROUND_TRUTH)
-    df_out = add_results(df,FILE_CSV)
+    if(GROUND_TRUTH != ""):
+        if((os.path.exists(FILE_CSV))):
+            df_partial = pd.read_csv(FILE_CSV)
+            N = df_partial.shape[0]
+        else:
+            df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity',
+                                    "TRUTH Rulename",'TRUTH Message','TRUTH Severity'])
+            
+        df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH,GROUND_TRUTH)
+        df_out = add_results_compare(df,FILE_CSV)
+    else:
+        if((os.path.exists(FILE_CSV))):
+            df_partial = pd.read_csv(FILE_CSV)
+            N = df_partial.shape[0]
+        else:
+            df_partial = pd.DataFrame(columns=["Command","ANSWER Rulename",'ANSWER Message','ANSWER Severity'])
+            
+        df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH)
+        df_out = add_results_single(df,FILE_CSV)
 
     df_out.to_csv(OUT_FILE, index=False)
     
