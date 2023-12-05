@@ -3,23 +3,36 @@ import os,ast,subprocess,argparse
 import logging as lg
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
-def extract_dataframe(des_path,answer_path, ground_truth="") -> pd.DataFrame:
+def extract_dataframe(des_path,answer_path, ground_truth="", FROM_ESCAPE=False) -> pd.DataFrame:
+
+    if(FROM_ESCAPE == True):
+        with open(answer_path, 'r') as f:
+            list_answer = [elem.split("\t")[1].strip() for elem in f.readlines()]
+        f.close()
+        lg.debug("Extracted descriptions: " + str(len(list_answer)))
+    else:
+        with open(answer_path, 'r') as f:
+            list_answer = [elem.strip() for elem in f.readlines()]
+        f.close()
+        lg.debug("Extracted descriptions: " + str(len(list_answer)))
+
     with open(des_path, 'r') as f:
+        #list_answer = ast.literal_eval(f.read())
         list_des = [elem.strip() for elem in f.readlines()]
     f.close()
-    lg.debug("Extracted descriptions: " + str(len(list_des)))
-
-    with open(answer_path, 'r') as f:
-        #list_answer = ast.literal_eval(f.read())
-        list_answer = [elem.strip() for elem in f.readlines()]
-    f.close()
-    lg.debug("Extracted answers: " + str(len(list_answer)))
+    lg.debug("Extracted answers: " + str(len(list_des)))
 
     if(ground_truth != ""):
-        with open(ground_truth, 'r') as f:
-            list_truth = [elem.strip() for elem in f.readlines()]
-        f.close()
-        lg.debug("Extracted truth: "+ str(len(list_truth)))
+        if(FROM_ESCAPE == True):
+            with open(ground_truth, 'r') as f:
+                list_truth = [elem.split("\t")[1].strip() for elem in f.readlines()]
+            f.close()
+            lg.debug("Extracted truth: "+ str(len(list_truth)))
+        else:
+            with open(ground_truth, 'r') as f:
+                list_truth = [elem.strip() for elem in f.readlines()]
+            f.close()
+            lg.debug("Extracted truth: "+ str(len(list_truth)))
 
         df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer, 'Ground Truth': list_truth})
         lg.debug("Created dataframe: ")
@@ -37,7 +50,7 @@ def parse_output(answer) -> []:
         f.write(answer)
     f.close()
 
-    result = subprocess.run(f'pwsh .\parser.ps1 buffer.ps1', stdout=subprocess.PIPE, text=True)
+    result = subprocess.run(f'powershell .\\parser.ps1 buffer.ps1', stdout=subprocess.PIPE, text=True)
     result = result.stdout.strip().split("--")
     result = [elem.strip("|").strip().strip("|") for elem in result]
 
@@ -104,6 +117,7 @@ if __name__ == '__main__':
     parser.add_argument("ANSWER_PATH", help="Answers text file path from the model")
     parser.add_argument("GROUND_TRUTH", help="Ground truth text file path",nargs='?',  default="")
     parser.add_argument("OUT_FILE", help="Output csv file", nargs='?',const="output.csv")
+    parser.add_argument("FROM_ESCAPE", help="Output files from escape", type=bool, nargs="?", default=False)
     parser.add_argument("-v","--verbose", help="Verbose", nargs='?', type=int, const=1, default=0)
     
     args = parser.parse_args()
@@ -111,6 +125,7 @@ if __name__ == '__main__':
     DESCRIPTION_PATH = args.DESCRIPTION_PATH
     ANSWER_PATH = args.ANSWER_PATH
     GROUND_TRUTH = args.GROUND_TRUTH
+    FROM_ESCAPE= args.FROM_ESCAPE
     FILE_CSV = "output_partial.csv"
     OUT_FILE = args.OUT_FILE
     VERBOSE = args.verbose
@@ -131,7 +146,7 @@ if __name__ == '__main__':
             df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity',
                                     "TRUTH Rulename",'TRUTH Message','TRUTH Severity'])
             
-        df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH,GROUND_TRUTH)
+        df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH,GROUND_TRUTH,FROM_ESCAPE)
         df_out = add_results_compare(df,FILE_CSV)
     else:
         if((os.path.exists(FILE_CSV))):
