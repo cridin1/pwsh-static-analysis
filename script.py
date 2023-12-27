@@ -1,26 +1,27 @@
 import pandas as pd
 import os,ast,subprocess,argparse
 import logging as lg
+from  math import pow
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
-def extract_dataframe(des_path,answer_path, ground_truth="", FROM_ESCAPE=False) -> pd.DataFrame:
+def extract_dataframe(answer_path, ground_truth="", FROM_ESCAPE=False) -> pd.DataFrame:
 
     if(FROM_ESCAPE == True):
         with open(answer_path, 'r') as f:
             list_answer = [elem.split("\t")[1].strip() for elem in f.readlines()]
         f.close()
-        lg.debug("Extracted descriptions: " + str(len(list_answer)))
+        lg.debug("Extracted answers: " + str(len(list_answer)))
     else:
         with open(answer_path, 'r') as f:
             list_answer = [elem.strip() for elem in f.readlines()]
         f.close()
-        lg.debug("Extracted descriptions: " + str(len(list_answer)))
+        lg.debug("Extracted answers: " + str(len(list_answer)))
 
-    with open(des_path, 'r') as f:
-        #list_answer = ast.literal_eval(f.read())
-        list_des = [elem.strip() for elem in f.readlines()]
-    f.close()
-    lg.debug("Extracted answers: " + str(len(list_des)))
+    # with open(des_path, 'r') as f:
+    #     #list_answer = ast.literal_eval(f.read())
+    #     list_des = [elem.strip() for elem in f.readlines()]
+    # f.close()
+    # lg.debug("Extracted answers: " + str(len(list_des)))
 
     if(ground_truth != ""):
         if(FROM_ESCAPE == True):
@@ -34,11 +35,14 @@ def extract_dataframe(des_path,answer_path, ground_truth="", FROM_ESCAPE=False) 
             f.close()
             lg.debug("Extracted truth: "+ str(len(list_truth)))
 
-        df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer, 'Ground Truth': list_truth})
+        #df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer, 'Ground Truth': list_truth})
+        df = pd.DataFrame(data={"Answer" : list_answer, 'Ground Truth': list_truth})
+
         lg.debug("Created dataframe: ")
         return df
     else:
-        df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer})
+        #df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer})
+        df = pd.DataFrame(data={"Answer" : list_answer})
         lg.debug("Created dataframe: ")
         return df
 
@@ -46,11 +50,14 @@ def extract_dataframe(des_path,answer_path, ground_truth="", FROM_ESCAPE=False) 
 def parse_output(answer) -> []:
     lg.debug(answer)
 
+    current_dir = os.getcwd()
+    
     with open("buffer.ps1", 'w') as f:
         f.write(answer)
     f.close()
 
-    result = subprocess.run(f'powershell .\\parser.ps1 buffer.ps1', stdout=subprocess.PIPE, text=True)
+    #pwsh o powershell a piacer del tuo WINDOWS
+    result = subprocess.run(f'pwsh {os.path.join(current_dir,"parser.ps1")} {os.path.join(current_dir,"buffer.ps1")}', stdout=subprocess.PIPE, text=True)
     result = result.stdout.strip().split("--")
     result = [elem.strip("|").strip().strip("|") for elem in result]
 
@@ -84,7 +91,9 @@ def add_results_compare(df,FILE_CSV) -> pd.DataFrame:
                 df_partial.to_csv(FILE_CSV, index=False)
 
     df_out = pd.concat([df,df_partial], axis = 1)
-    os.remove("buffer.ps1")
+    
+    if(os.path.exists("buffer.ps1")):
+        os.remove("buffer.ps1")
 
     return df_out
 
@@ -110,10 +119,87 @@ def add_results_single(df,FILE_CSV) -> pd.DataFrame:
 
     return df_out
 
+def str2list(string):
+    return string[1:-1].split(",")
+
+def calculate_syntax_metric_single(df) -> float:
+    l = df.shape[0]
+    count = 0
+    skip_error_rule = ['RedirectionNotSupported'] #["The '<' operator is reserved for future use. "]
+    
+    for i,row in df.iterrows():
+        list_rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Rulename'])]
+        list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Severity'])]
+        
+        list_a = list(zip(list_rulename,list_severity))
+        
+        for elem_a in list_a:
+            if(elem_a[1] != "ParseError" or elem_a[0] in skip_error_rule):
+                list_a.remove(elem_a)
+        
+        for j,elem in enumerate(list_a):
+            if(elem[0] not in skip_error_rule):
+                if(elem[1] == 'ParseError'):
+                    count += pow(2,-j)
+                    lg.debug(count, j, elem[0])
+
+    return count/l
+
+def calculate_syntax_metric_double(df) -> float:
+    l = df.shape[0]
+    count= 0
+    skip_error_rule = ['RedirectionNotSupported'] #["The '<' operator is reserved for future use. "]
+    
+    for i,row in df.iterrows():
+        count_partial_a,count_partial_b = 0,0
+        
+        list_rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Rulename'])]
+        list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Severity'])]
+        
+        list_rulename_t = [elem.replace("'","").replace(" ","") for elem in str2list(row['TRUTH Rulename'])]
+        list_severity_t = [elem.replace("'","").replace(" ","") for elem in str2list(row['TRUTH Severity'])]
+        
+        list_a = list(zip(list_rulename, list_severity))
+        list_b = list(zip(list_rulename_t, list_severity_t))
+        
+        for elem_a in list_a:
+            if(elem_a[1] != "ParseError" or elem_a[0] in skip_error_rule):
+                list_a.remove(elem_a)
+                        
+        for elem_b in list_b:
+            if(elem_b[1] != "ParseError" or elem_b[0] in skip_error_rule):
+                list_b.remove(elem_b)
+        
+        # for elem_a in list_a:
+        #     for elem_b in list_b:
+        #         if(elem_a not in skip_error_rule):
+        #             if(elem_a[0] == elem_b[0]): ##non è completamente corretto, potrebbero esserci delle coincidenze non volute
+        #                 list_b.remove(elem_b)
+        
+        for j,elem in enumerate(list_a):
+            if(elem[0] not in skip_error_rule):
+                if(elem[1] == 'ParseError'):
+                    count_partial_a += pow(2,-j)
+                    
+        for j,elem in enumerate(list_b):
+            if(elem[0] not in skip_error_rule):
+                if(elem[1] == 'ParseError'):
+                    count_partial_b += pow(2,-j)
+        
+        lg.debug(f"Partial A: {count_partial_a} Partial B: {count_partial_b}")
+        if(count_partial_a > count_partial_b):
+            #penalizing the score if there are errors in the ground truth
+            count += (count_partial_a-count_partial_b)
+        else:
+            count += count_partial_a
+    
+    return count/l
+
+
 if __name__ == '__main__':
  
     parser = argparse.ArgumentParser(description="Python NLP wrapper for powershell syntax analysis through PSScript Analyzer")
-    parser.add_argument("DESCRIPTION_PATH", help="Description text file path from the model")
+    #parser.add_argument("DESCRIPTION_PATH", help="Description text file path from the model")
     parser.add_argument("ANSWER_PATH", help="Answers text file path from the model")
     parser.add_argument("GROUND_TRUTH", help="Ground truth text file path",nargs='?',  default="")
     parser.add_argument("OUT_FILE", help="Output csv file", nargs='?',const="output.csv")
@@ -122,11 +208,11 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
-    DESCRIPTION_PATH = args.DESCRIPTION_PATH
+    #DESCRIPTION_PATH = args.DESCRIPTION_PATH
     ANSWER_PATH = args.ANSWER_PATH
     GROUND_TRUTH = args.GROUND_TRUTH
     FROM_ESCAPE= args.FROM_ESCAPE
-    FILE_CSV = "output_partial.csv"
+    FILE_CSV = "output_partial6.csv"
     OUT_FILE = args.OUT_FILE
     VERBOSE = args.verbose
     
@@ -146,17 +232,21 @@ if __name__ == '__main__':
             df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity',
                                     "TRUTH Rulename",'TRUTH Message','TRUTH Severity'])
             
-        df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH,GROUND_TRUTH,FROM_ESCAPE)
+        df = extract_dataframe(ANSWER_PATH,GROUND_TRUTH,FROM_ESCAPE)
         df_out = add_results_compare(df,FILE_CSV)
+        print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
+        print("Syntax metric double: ",calculate_syntax_metric_double(df_out))
     else:
         if((os.path.exists(FILE_CSV))):
             df_partial = pd.read_csv(FILE_CSV)
             N = df_partial.shape[0]
         else:
-            df_partial = pd.DataFrame(columns=["Command","ANSWER Rulename",'ANSWER Message','ANSWER Severity'])
+            df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity'])
             
-        df = extract_dataframe(DESCRIPTION_PATH,ANSWER_PATH)
+        df = extract_dataframe(ANSWER_PATH)
         df_out = add_results_single(df,FILE_CSV)
 
+        print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
+        
     df_out.to_csv(OUT_FILE, index=False)
     
