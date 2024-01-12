@@ -2,7 +2,7 @@
 Python NLP wrapper for powershell syntax analysis through PSScript Analyzer. Make sure you have installed [PSScript Analyzer](https://github.com/PowerShell/PSScriptAnalyzer).
 
 ```bash
-PS > python script.py -h                                                                 
+PS > python analyzer.py -h                                                                 
 
      __        __           __           ___                                     __  ___  __
     |__) |  | /__` |__| __ /__` \ / |\ |  |   /\  \_/ __  /\  |\ |  /\  |    \ /  / |__  |__)
