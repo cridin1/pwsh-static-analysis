@@ -231,7 +231,6 @@ if __name__ == '__main__':
     ANSWER_PATH = args.ANSWER_PATH
     GROUND_TRUTH = args.GROUND_TRUTH
     FROM_ESCAPE= args.FROM_ESCAPE
-    FILE_CSV = "output_partial.csv"
     OUT_FILE = args.OUT_FILE
     VERBOSE = args.v
     
@@ -244,26 +243,26 @@ if __name__ == '__main__':
     N = 0
     
     if(GROUND_TRUTH != ""):
-        if((os.path.exists(FILE_CSV))):
-            df_partial = pd.read_csv(FILE_CSV)
+        if((os.path.exists(OUT_FILE))):
+            df_partial = pd.read_csv(OUT_FILE)
         else:
             df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity',
                                     "TRUTH Rulename",'TRUTH Message','TRUTH Severity'])
             
         df = extract_dataframe(ANSWER_PATH,GROUND_TRUTH,FROM_ESCAPE)
-        df_out = add_results_compare(df, df_partial, FILE_CSV)
+        df_out = add_results_compare(df, df_partial, OUT_FILE)
         
         print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
         print("Syntax metric double: ",calculate_syntax_metric_double(df_out))
         
     else:
-        if((os.path.exists(FILE_CSV))):
-            df_partial = pd.read_csv(FILE_CSV)
+        if((os.path.exists(OUT_FILE))):
+            df_partial = pd.read_csv(OUT_FILE)
         else:
             df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity'])
             
         df = extract_dataframe(ANSWER_PATH)
-        df_out = add_results_single(df,df_partial,FILE_CSV)
+        df_out = add_results_single(df,df_partial,OUT_FILE)
 
         print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
         
