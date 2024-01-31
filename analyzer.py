@@ -135,7 +135,7 @@ def str2list(string):
 def calculate_syntax_metric_single(df) -> float:
     l = df.shape[0]
     count = 0
-    skip_error_rule = ['RedirectionNotSupported'] #["The '<' operator is reserved for future use. "]
+    skip_error_rule = ['RedirectionNotSupported', "MissingFileSpecification"] #["The '<' operator is reserved for future use. "]
     
     for i,row in df.iterrows():
         
@@ -168,7 +168,7 @@ def calculate_syntax_metric_single(df) -> float:
 def calculate_syntax_metric_double(df) -> float:
     l = df.shape[0]
     count= 0
-    skip_error_rule = ['RedirectionNotSupported'] #["The '<' operator is reserved for future use. "]
+    skip_error_rule = ['RedirectionNotSupported', "MissingFileSpecification"] #["The '<' operator is reserved for future use. "]
     
     for i,row in df.iterrows():
         
@@ -219,9 +219,9 @@ if __name__ == '__main__':
     """)
     parser = argparse.ArgumentParser(description="Python NLP wrapper for powershell syntax analysis through PSScript Analyzer")
     #parser.add_argument("DESCRIPTION_PATH", help="Description text file path from the model")
+    parser.add_argument("OUT_FILE", help="Output csv file", nargs='?',const="output.csv")
     parser.add_argument("ANSWER_PATH", help="Answers text file path from the model")
     parser.add_argument("GROUND_TRUTH", help="Ground truth text file path",nargs='?',  default="")
-    parser.add_argument("OUT_FILE", help="Output csv file", nargs='?',const="output.csv")
     parser.add_argument("FROM_ESCAPE", help="Output files from ESCAPE", type=bool, nargs="?", default=False)
     parser.add_argument("-v", help="Verbose", nargs='?', type=int, const=1, default=0)
     
