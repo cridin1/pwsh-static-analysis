@@ -159,6 +159,7 @@ def calculate_syntax_metric_single(df) -> float:
         for j,elem in enumerate(list_a_filtered):
             if(elem[1] == 'ParseError'):
                 count += 1
+                lg.info(f"Answer: {row} {i}")
                 break
     
     lg.info(f"Count valid ParseErrors: {count}/{l}")
@@ -201,7 +202,7 @@ def calculate_syntax_metric_double(df) -> float:
         for j,elem in enumerate(list_a_filtered):
             if(elem[1] == 'ParseError' and elem not in list_equals):
                 count += 1
-                lg.debug(f"Answer: {elem} {i}")
+                lg.info(f"Answer: {elem} {i}")
                 break
     
     lg.info(f"Count valid ParseErrors: {count}/{l}")
