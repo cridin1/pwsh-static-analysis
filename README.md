@@ -1,5 +1,5 @@
 # pwsh-syntax-analyzer
-Static code checker for powershell code.
+Static code analysis for powershell code. 
 Make sure you have installed [PSScript Analyzer](https://github.com/PowerShell/PSScriptAnalyzer).
 
 ```bash
