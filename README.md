@@ -1,5 +1,7 @@
 # pwsh-syntax-analyzer
-Static code analysis for powershell code. 
+![syntax-analysis](https://github.com/cridin1/pwsh-syntax-analysis/blob/main/static-analysis.png)
+
+Static code analysis for PowerShell code. 
 Make sure you have installed [PSScript Analyzer](https://github.com/PowerShell/PSScriptAnalyzer).
 
 ```bash
@@ -12,10 +14,10 @@ PS > python analyzer.py -h
 
 usage: analyzer.py [-h] [-v [V]] [OUT_FILE] ANSWER_PATH [GROUND_TRUTH] [FROM_ESCAPE]
 
-Python NLP wrapper for powershell syntax analysis through PSScript Analyzer
+Python NLP wrapper for PowerShell syntax analysis through PSScript Analyzer
 
 positional arguments:
-  OUT_FILE      Output csv file
+  OUT_FILE      Output CSV file
   ANSWER_PATH   Answers text file path from the model
   GROUND_TRUTH  Ground truth text file path
   FROM_ESCAPE   Output files from ESCAPE
