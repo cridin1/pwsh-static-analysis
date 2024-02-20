@@ -1,4 +1,4 @@
-# pwsh-syntax-analyzer
+# pwsh-static-analyzer
 ![syntax-analysis](https://github.com/cridin1/pwsh-syntax-analysis/blob/main/static-analysis.png)
 
 Static code analysis for PowerShell code. 
