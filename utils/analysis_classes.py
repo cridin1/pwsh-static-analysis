@@ -110,7 +110,7 @@ def calculate_syntax_metric_double(df) -> float:
 
 
 file_list = ['codegen_pretrained.csv', 'codegpt_nopretrain.csv', 'codet5_pretrained.csv', 'groundtruth.csv']
-warning_list_complete = []
+
 for elem in file_list:
     df  = pd.read_csv(elem)
     percentage_parse, parse_errors_list = calculate_syntax_metric_single(df, "ParseError")
@@ -126,15 +126,3 @@ for elem in file_list:
     print(f"Percentage Error: {percentage_error}")
     print(f"Percentage Warning: {percentage_warning} \n")
     print(f"Percentage Double: {doub} \n")
-
-# fig, ax = plt.subplots()
-# warning_list_complete = pd.Series(warning_list_complete).value_counts()
-# print(warning_list_complete)
-# #change bar size
-# ax.bar(warning_list_complete.index, warning_list_complete.values, width=0.3)
-# #warning_list_complete.plot(ax=ax, kind='bar', xlabel='numbers', ylabel='frequency')
-
-# plt.xticks(rotation=15, fontsize=6)
-# plt.xlabel('Warnings')
-# plt.ylabel('Number of occurrences')
-# plt.show()
