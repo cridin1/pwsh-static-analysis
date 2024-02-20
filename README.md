@@ -26,3 +26,5 @@ options:
   -h, --help    show this help message and exit
   -v [V]        Verbose
 ```
+
+In `utils\analysis_classes.py`, the analysis is extended to different error types.
