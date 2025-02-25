@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
-def extract_dataframe(PS_PATH, ground_truth="", FROM_ESCAPE=False, SCRIPT_MODE=False) -> pd.DataFrame:
+def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=False) -> pd.DataFrame:
     if(SCRIPT_MODE == False):
         if(FROM_ESCAPE == True):
             with open(PS_PATH, 'r') as f:
@@ -19,8 +19,8 @@ def extract_dataframe(PS_PATH, ground_truth="", FROM_ESCAPE=False, SCRIPT_MODE=F
             f.close()
             lg.debug("Extracted CODE: " + str(len(list_powershell)))
     else:
+        list_scripts = []
         for root, dirs, files in os.walk(PS_PATH):
-            list_scripts = []
             for file in files:
                 if(".ps" in file):
                     with open(os.path.join(root,file), 'r') as f:
@@ -28,24 +28,24 @@ def extract_dataframe(PS_PATH, ground_truth="", FROM_ESCAPE=False, SCRIPT_MODE=F
                     f.close()
             lg.debug(f"Extracted scripts: " + str(len(list_scripts)))
 
-        list_powershell = list_scripts
+        list_target_powershell = list_scripts
 
-    if(ground_truth != ""):
+    if(GROUND_TRUTH != ""):
         if(SCRIPT_MODE == False):
             if(FROM_ESCAPE == True):
-                with open(ground_truth, 'r') as f:
+                with open(GROUND_TRUTH, 'r') as f:
                     list_truth = [elem.split("\t")[1].strip() for elem in f.readlines()]
                 f.close()
                 lg.debug("Extracted truth: "+ str(len(list_truth)))
             else:
-                with open(ground_truth, 'r') as f:
+                with open(GROUND_TRUTH, 'r') as f:
                     list_truth = [elem.strip() for elem in f.readlines()]
                 f.close()
                 lg.debug("Extracted truth: "+ str(len(list_truth)))
         
         else:
-            for root, dirs, files in os.walk(PS_PATH):
-                list_scripts = []
+            list_scripts = []
+            for root, dirs, files in os.walk(GROUND_TRUTH):
                 for file in files:
                     if(".ps" in file):
                         with open(os.path.join(root,file), 'r') as f:
@@ -55,12 +55,12 @@ def extract_dataframe(PS_PATH, ground_truth="", FROM_ESCAPE=False, SCRIPT_MODE=F
 
             list_truth = list_scripts
 
-        df = pd.DataFrame(data={"CODE" : list_powershell, 'Ground Truth': list_truth})
+        df = pd.DataFrame(data={"CODE" : list_target_powershell, 'Ground Truth': list_truth})
 
         lg.debug("Created dataframe: ")
         return df
     else:
-        df = pd.DataFrame(data={"CODE" : list_powershell})
+        df = pd.DataFrame(data={"CODE" : list_target_powershell})
         lg.debug("Created dataframe: ")
         return df
 
@@ -108,9 +108,11 @@ def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
                 df_partial.loc[len(df_partial.index)] = answer_out+truth_out
             finally:
                 df_partial.to_csv(FILE_CSV, index=False)
-
+        
+        
     df_out = pd.concat([df,df_partial], axis = 1)
-    
+    print(df_out.columns)
+
     if(os.path.exists("buffer.ps1")):
         os.remove("buffer.ps1")
 
