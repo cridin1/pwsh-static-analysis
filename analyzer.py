@@ -6,56 +6,72 @@ from tqdm import tqdm
 
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
 
-def extract_dataframe(answer_path, ground_truth="", FROM_ESCAPE=False) -> pd.DataFrame:
-
-    if(FROM_ESCAPE == True):
-        with open(answer_path, 'r') as f:
-            list_answer = [elem.split("\t")[1].strip() for elem in f.readlines()]
-        f.close()
-        lg.debug("Extracted answers: " + str(len(list_answer)))
+def extract_dataframe(PS_PATH, ground_truth="", FROM_ESCAPE=False, SCRIPT_MODE=False) -> pd.DataFrame:
+    if(SCRIPT_MODE == False):
+        if(FROM_ESCAPE == True):
+            with open(PS_PATH, 'r') as f:
+                list_powershell = [elem.split("\t")[1].strip() for elem in f.readlines()]
+            f.close()
+            lg.debug("Extracted CODE: " + str(len(list_powershell)))
+        else:
+            with open(PS_PATH, 'r') as f:
+                list_powershell = [elem.strip() for elem in f.readlines()]
+            f.close()
+            lg.debug("Extracted CODE: " + str(len(list_powershell)))
     else:
-        with open(answer_path, 'r') as f:
-            list_answer = [elem.strip() for elem in f.readlines()]
-        f.close()
-        lg.debug("Extracted answers: " + str(len(list_answer)))
+        for root, dirs, files in os.walk(PS_PATH):
+            list_scripts = []
+            for file in files:
+                if(".ps" in file):
+                    with open(os.path.join(root,file), 'r') as f:
+                        list_scripts.append(f.read())
+                    f.close()
+            lg.debug(f"Extracted scripts: " + str(len(list_scripts)))
 
-    # with open(des_path, 'r') as f:
-    #     #list_answer = ast.literal_eval(f.read())
-    #     list_des = [elem.strip() for elem in f.readlines()]
-    # f.close()
-    # lg.debug("Extracted answers: " + str(len(list_des)))
+        list_powershell = list_scripts
 
     if(ground_truth != ""):
-        if(FROM_ESCAPE == True):
-            with open(ground_truth, 'r') as f:
-                list_truth = [elem.split("\t")[1].strip() for elem in f.readlines()]
-            f.close()
-            lg.debug("Extracted truth: "+ str(len(list_truth)))
+        if(SCRIPT_MODE == False):
+            if(FROM_ESCAPE == True):
+                with open(ground_truth, 'r') as f:
+                    list_truth = [elem.split("\t")[1].strip() for elem in f.readlines()]
+                f.close()
+                lg.debug("Extracted truth: "+ str(len(list_truth)))
+            else:
+                with open(ground_truth, 'r') as f:
+                    list_truth = [elem.strip() for elem in f.readlines()]
+                f.close()
+                lg.debug("Extracted truth: "+ str(len(list_truth)))
+        
         else:
-            with open(ground_truth, 'r') as f:
-                list_truth = [elem.strip() for elem in f.readlines()]
-            f.close()
-            lg.debug("Extracted truth: "+ str(len(list_truth)))
+            for root, dirs, files in os.walk(PS_PATH):
+                list_scripts = []
+                for file in files:
+                    if(".ps" in file):
+                        with open(os.path.join(root,file), 'r') as f:
+                            list_scripts.append(f.read())
+                        f.close()
+                lg.debug(f"Extracted truth: " + str(len(list_scripts)))
 
-        #df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer, 'Ground Truth': list_truth})
-        df = pd.DataFrame(data={"Answer" : list_answer, 'Ground Truth': list_truth})
+            list_truth = list_scripts
+
+        df = pd.DataFrame(data={"CODE" : list_powershell, 'Ground Truth': list_truth})
 
         lg.debug("Created dataframe: ")
         return df
     else:
-        #df = pd.DataFrame(data={"Description": list_des,"Answer" : list_answer})
-        df = pd.DataFrame(data={"Answer" : list_answer})
+        df = pd.DataFrame(data={"CODE" : list_powershell})
         lg.debug("Created dataframe: ")
         return df
 
 
-def parse_output(answer) -> []:
-    lg.debug(answer)
+def parse_output(CODE) -> []:
+    #lg.debug(CODE)
 
     current_dir = os.getcwd()
     
     with open("buffer.ps1", 'w') as f:
-        f.write(answer)
+        f.write(CODE)
     f.close()
 
     #pwsh o powershell a piacer del tuo WINDOWS
@@ -68,7 +84,7 @@ def parse_output(answer) -> []:
     except:
         pass
     
-    lg.debug(result)
+    #lg.debug(result)
     return result
 
 def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
@@ -76,7 +92,7 @@ def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
     N = df_partial.shape[0]
     for i,row in tqdm(df.iterrows(),total=l, colour='blue'):
         if(i>=N):
-            answer,truth = row['Answer'], row['Ground Truth']
+            answer,truth = row['CODE'], row['Ground Truth']
             answer_out = parse_output(answer)
             truth_out = parse_output(truth) 
 
@@ -87,7 +103,6 @@ def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
                 truth_out = ['','','']
 
             lg.debug(f"It: {i+1}/{l} Len_ans_out: {len(answer_out)} Len_truth_out: {len(truth_out)}")
-            
             
             try:
                 df_partial.loc[len(df_partial.index)] = answer_out+truth_out
@@ -106,7 +121,7 @@ def add_results_single(df,df_partial,FILE_CSV) -> pd.DataFrame:
     N = df_partial.shape[0]
     for i,row in tqdm(df.iterrows(), total=l, colour='blue'):
         if(i>=N):
-            answer = row['Answer']
+            answer = row['CODE']
             answer_out = parse_output(answer)
 
             if(answer_out == ['']):
@@ -139,12 +154,12 @@ def calculate_syntax_metric_single(df) -> float:
     
     for i,row in df.iterrows():
         
-        if(type(row['ANSWER Rulename']) == str):
-            list_rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Rulename'])]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Severity'])]
+        if(type(row['CODE Rulename']) == str):
+            list_rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Rulename'])]
+            list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Severity'])]
         else:
-            list_rulename = [elem.replace("'","").replace(" ","") for elem in row['ANSWER Rulename']]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in row['ANSWER Severity']]
+            list_rulename = [elem.replace("'","").replace(" ","") for elem in row['CODE Rulename']]
+            list_severity = [elem.replace("'","").replace(" ","") for elem in row['CODE Severity']]
         
         if(list_rulename == [] or list_rulename == ['']):
             continue
@@ -159,7 +174,7 @@ def calculate_syntax_metric_single(df) -> float:
         for j,elem in enumerate(list_a_filtered):
             if(elem[1] == 'ParseError'):
                 count += 1
-                lg.info(f"Answer: {row} {i}")
+                lg.debug(f"Answer: {row} {i}")
                 break
     
     lg.info(f"Count valid ParseErrors: {count}/{l}")
@@ -173,14 +188,14 @@ def calculate_syntax_metric_double(df) -> float:
     
     for i,row in df.iterrows():
         
-        if(type(row['ANSWER Rulename']) == str):
-            list_rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Rulename'])]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['ANSWER Severity'])]
+        if(type(row['CODE Rulename']) == str):
+            list_rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Rulename'])]
+            list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Severity'])]
             list_rulename_t = [elem.replace("'","").replace(" ","") for elem in str2list(row['TRUTH Rulename'])]
             list_severity_t = [elem.replace("'","").replace(" ","") for elem in str2list(row['TRUTH Severity'])]
         else:
-            list_rulename = [elem.replace("'","").replace(" ","") for elem in row['ANSWER Rulename']]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in row['ANSWER Severity']]
+            list_rulename = [elem.replace("'","").replace(" ","") for elem in row['CODE Rulename']]
+            list_severity = [elem.replace("'","").replace(" ","") for elem in row['CODE Severity']]
             list_rulename_t = [elem.replace("'","").replace(" ","") for elem in row['TRUTH Rulename']]
             list_severity_t = [elem.replace("'","").replace(" ","") for elem in row['TRUTH Severity']]
         
@@ -202,7 +217,7 @@ def calculate_syntax_metric_double(df) -> float:
         for j,elem in enumerate(list_a_filtered):
             if(elem[1] == 'ParseError' and elem not in list_equals):
                 count += 1
-                lg.info(f"Answer: {elem} {i}")
+                lg.debug(f"Answer: {elem} {i}")
                 break
     
     lg.info(f"Count valid ParseErrors: {count}/{l}")
@@ -212,26 +227,30 @@ def calculate_syntax_metric_double(df) -> float:
 
 if __name__ == '__main__':
  
-    print("""                                                                                                                                  
-     __        __           __           ___                                     __  ___  __  
-    |__) |  | /__` |__| __ /__` \ / |\ |  |   /\  \_/ __  /\  |\ |  /\  |    \ /  / |__  |__) 
-    |    |/\| .__/ |  |    .__/  |  | \|  |  /~~\ / \    /~~\ | \| /~~\ |___  |  /_ |___ |  \ 
+    print("""        
+
+
+ █▀▄ █   █ ▄▀▀ █▄█    ▄▀▀ ▀█▀ ▄▀▄ ▀█▀ █ ▄▀▀    ▄▀▄ █▄ █ ▄▀▄ █   ▀▄▀ ▄▀▀ █ ▄▀▀
+ █▀  ▀▄▀▄▀ ▄██ █ █ ▀▀ ▄██  █  █▀█  █  █ ▀▄▄ ▀▀ █▀█ █ ▀█ █▀█ █▄▄  █  ▄██ █ ▄██
+
                                                                                             
     """)
     parser = argparse.ArgumentParser(description="Python NLP wrapper for powershell syntax analysis through PSScript Analyzer")
     #parser.add_argument("DESCRIPTION_PATH", help="Description text file path from the model")
     parser.add_argument("OUT_FILE", help="Output csv file", nargs='?',const="output.csv")
-    parser.add_argument("ANSWER_PATH", help="Answers text file path from the model")
+    parser.add_argument("PS_PATH", help="CODE file path from the model", type=str)
     parser.add_argument("GROUND_TRUTH", help="Ground truth text file path",nargs='?',  default="")
-    parser.add_argument("FROM_ESCAPE", help="Output files from ESCAPE", type=bool, nargs="?", default=False)
+    parser.add_argument("--SCRIPT_MODE", help="Multiple Scripts mode", action="store_true", default=False)
+    parser.add_argument("--FROM_ESCAPE", help="Output files from ESCAPE", action="store_true", default=False)
     parser.add_argument("-v", help="Verbose", nargs='?', type=int, const=1, default=0)
     
     args = parser.parse_args()
     
     #DESCRIPTION_PATH = args.DESCRIPTION_PATH
-    ANSWER_PATH = args.ANSWER_PATH
+    PS_PATH = args.PS_PATH
     GROUND_TRUTH = args.GROUND_TRUTH
     FROM_ESCAPE= args.FROM_ESCAPE
+    SCRIPT_MODE = args.SCRIPT_MODE
     OUT_FILE = args.OUT_FILE
     VERBOSE = args.v
     
@@ -247,10 +266,10 @@ if __name__ == '__main__':
         if((os.path.exists(OUT_FILE))):
             df_partial = pd.read_csv(OUT_FILE)
         else:
-            df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity',
+            df_partial = pd.DataFrame(columns=["CODE Rulename",'CODE Message','CODE Severity',
                                     "TRUTH Rulename",'TRUTH Message','TRUTH Severity'])
             
-        df = extract_dataframe(ANSWER_PATH,GROUND_TRUTH,FROM_ESCAPE)
+        df = extract_dataframe(PS_PATH,GROUND_TRUTH,FROM_ESCAPE, SCRIPT_MODE)
         df_out = add_results_compare(df, df_partial, OUT_FILE)
         
         print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
@@ -260,9 +279,9 @@ if __name__ == '__main__':
         if((os.path.exists(OUT_FILE))):
             df_partial = pd.read_csv(OUT_FILE)
         else:
-            df_partial = pd.DataFrame(columns=["ANSWER Rulename",'ANSWER Message','ANSWER Severity'])
+            df_partial = pd.DataFrame(columns=["CODE Rulename",'CODE Message','CODE Severity'])
             
-        df = extract_dataframe(ANSWER_PATH)
+        df = extract_dataframe(PS_PATH, FROM_ESCAPE=FROM_ESCAPE, SCRIPT_MODE=SCRIPT_MODE)
         df_out = add_results_single(df,df_partial,OUT_FILE)
 
         print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
