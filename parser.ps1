@@ -1,20 +1,7 @@
 param(
-    [string]$script_path
+    [string]$script_path,
+    [string]$output_path
 )
 
-
-$array = Invoke-ScriptAnalyzer $script_path -Settings PSGallery
-$result = ''
-foreach ($elem in $array) {
-    $result+=$elem.Rulename + " | "
-}
-$result += '--'
-foreach ($elem in $array) {
-    $result+=$elem.Message + " | "
-}
-$result += '--'
-foreach ($elem in $array) {
-    $result+=$elem.Severity.ToString() + " | "
-}
-echo $result
-
+$array = Invoke-ScriptAnalyzer $script_path -Settings PSGallery -Recurse
+$array | Export-Csv -Path $output_path -NoTypeInformation

@@ -6,7 +6,8 @@ from tqdm import tqdm
 import tempfile
 
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
-tmp_buffer = tempfile.NamedTemporaryFile(delete=True, delete_on_close=False, dir=os.getcwd(), suffix=".ps1")
+tmp_csv_code = tempfile.NamedTemporaryFile(delete=True, delete_on_close=False, dir=os.getcwd(), suffix=".csv")
+tmp_csv_truth = tempfile.NamedTemporaryFile(delete=True, delete_on_close=False, dir=os.getcwd(), suffix=".csv")
 
 def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=False) -> pd.DataFrame:
     if(SCRIPT_MODE == False):
@@ -31,6 +32,8 @@ def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=F
             lg.debug(f"Extracted scripts: " + str(len(list_scripts)))
 
         list_target_powershell = list_scripts
+        parse_analysis(PS_PATH, tmp_csv_code.name)
+
 
     if(GROUND_TRUTH != ""):
         if(SCRIPT_MODE == False):
@@ -56,6 +59,7 @@ def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=F
                 lg.debug(f"Extracted truth: " + str(len(list_scripts)))
 
             list_truth = list_scripts
+            parse_analysis(PS_PATH, tmp_csv_code.name)
 
         df = pd.DataFrame(data={"CODE" : list_target_powershell, 'Ground Truth': list_truth})
 
@@ -66,34 +70,28 @@ def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=F
         lg.debug("Created dataframe: ")
         return df
 
-def parse_output(CODE) -> []:
+def parse_analysis(PS_PATH, GROUND_TRUTH, PATH_CSV):
     current_dir = os.getcwd()
-    
-    with open(tmp_buffer.name, 'w') as f:
-        f.write(CODE)
-    f.close()
 
     #pwsh o powershell
-    result = subprocess.run(f'pwsh {os.path.join(current_dir,"parser.ps1")}  {tmp_buffer.name}', stdout=subprocess.PIPE, text=True)
-    result = result.stdout.strip().split("--")
-    result = [elem.strip("|").strip().strip("|") for elem in result]
+    result = subprocess.call(f'pwsh {os.path.join(current_dir,"parser.ps1")} {} {PATH_CSV}', stdout=subprocess.PIPE, text=True)
+    df = pd.read_csv(PATH_CSV)
+    df = df.groupby('ScriptName').agg(lambda x: x.tolist()).reset_index()
 
-    try: 
-        result = [elem.split("|") for elem in result]
-    except:
-        pass
-    
-    lg.debug(result)
-    return result
+    lg.debug(df.columns)
+    return df
 
 def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
     l = df.shape[0]
     N = df_partial.shape[0]
+
+    answer_df = parse_analysis(PS_PATH, tmp_csv_code.name)
+    truth_df = parse_analysis(tmp_csv_truth.name) 
+
+
     for i,row in tqdm(df.iterrows(),total=l, colour='blue'):
         if(i>=N):
             answer,truth = row['CODE'], row['Ground Truth']
-            answer_out = parse_output(answer)
-            truth_out = parse_output(truth) 
 
             if(answer_out == ['']):
                 answer_out = ['','','']
@@ -171,10 +169,8 @@ def calculate_syntax_metric_single(df) -> float:
                 count += 1
                 lg.debug(f"Answer: {row} {i}")
                 break
-    
-    lg.info(f"Count valid ParseErrors: {count}/{l}")
-    
-    return round((1-count/l)*100,2)
+        
+    return round((1-count/l)*100,2), count, l
 
 def calculate_syntax_metric_double(df) -> float:
     l = df.shape[0]
@@ -215,9 +211,7 @@ def calculate_syntax_metric_double(df) -> float:
                 lg.debug(f"Answer: {elem} {i}")
                 break
     
-    lg.info(f"Count valid ParseErrors: {count}/{l}")
-    
-    return round((1-count/l)*100,2)
+    return round((1-count/l)*100,2), count, l
 
 
 if __name__ == '__main__':
@@ -266,8 +260,22 @@ if __name__ == '__main__':
         df = extract_dataframe(PS_PATH,GROUND_TRUTH,FROM_ESCAPE, SCRIPT_MODE)
         df_out = add_results_compare(df, df_partial, OUT_FILE)
         
-        print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
-        print("Syntax metric double: ",calculate_syntax_metric_double(df_out))
+        single_metric, count1, l1 = calculate_syntax_metric_single(df_out)
+        double_metric, count2, l2 = calculate_syntax_metric_double(df_out)
+
+        lg.info(f"Count valid ParseErrors: {count1}/{l1}")
+        lg.info("Syntax metric single: ",single_metric)
+        lg.info(f"Count valid ParseErrors: {count2}/{l2}")
+        lg.info("Syntax metric double: ",double_metric)
+
+        #write the print on file
+        with open(OUT_FILE.replace(".csv",".txt"), 'w') as f:
+            f.write(f"Count valid ParseErrors: {count1}/{l1}")
+            f.write(f"Syntax metric single: {single_metric}\n")
+            f.write(f"Count valid ParseErrors: {count2}/{l2}")
+            f.write(f"Syntax metric double: {double_metric}\n")
+        f.close()
+
         
     else:
         if((os.path.exists(OUT_FILE))):
@@ -278,7 +286,14 @@ if __name__ == '__main__':
         df = extract_dataframe(PS_PATH, FROM_ESCAPE=FROM_ESCAPE, SCRIPT_MODE=SCRIPT_MODE)
         df_out = add_results_single(df,df_partial,OUT_FILE)
 
-        print("Syntax metric single: ",calculate_syntax_metric_single(df_out))
+        single_metric, count, l = calculate_syntax_metric_single(df_out)
+
+        lg.info(f"Count valid ParseErrors: {count}/{l}")
+        lg.info("Syntax metric single: ", single_metric)
+
+        with open(OUT_FILE.replace(".csv",".txt"), 'w') as f:
+            f.write(f"Count valid ParseErrors: {count}/{l}")
+            f.write(f"Syntax metric single: {single_metric}\n")
+        f.close()
         
     df_out.to_csv(OUT_FILE, index=False)
-    
