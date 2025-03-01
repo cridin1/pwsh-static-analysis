@@ -3,8 +3,10 @@ import os,ast,subprocess,argparse
 import logging as lg
 from  math import pow
 from tqdm import tqdm
+import tempfile
 
 lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+tmp_buffer = tempfile.NamedTemporaryFile(delete=True, delete_on_close=False, dir=os.getcwd(), suffix=".ps1")
 
 def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=False) -> pd.DataFrame:
     if(SCRIPT_MODE == False):
@@ -64,18 +66,15 @@ def extract_dataframe(PS_PATH, GROUND_TRUTH="", FROM_ESCAPE=False, SCRIPT_MODE=F
         lg.debug("Created dataframe: ")
         return df
 
-
 def parse_output(CODE) -> []:
-    #lg.debug(CODE)
-
     current_dir = os.getcwd()
     
-    with open("buffer.ps1", 'w') as f:
+    with open(tmp_buffer.name, 'w') as f:
         f.write(CODE)
     f.close()
 
-    #pwsh o powershell a piacer del tuo WINDOWS
-    result = subprocess.run(f'pwsh {os.path.join(current_dir,"parser.ps1")} {os.path.join(current_dir,"buffer.ps1")}', stdout=subprocess.PIPE, text=True)
+    #pwsh o powershell
+    result = subprocess.run(f'pwsh {os.path.join(current_dir,"parser.ps1")}  {tmp_buffer.name}', stdout=subprocess.PIPE, text=True)
     result = result.stdout.strip().split("--")
     result = [elem.strip("|").strip().strip("|") for elem in result]
 
@@ -84,7 +83,7 @@ def parse_output(CODE) -> []:
     except:
         pass
     
-    #lg.debug(result)
+    lg.debug(result)
     return result
 
 def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
@@ -111,10 +110,7 @@ def add_results_compare(df, df_partial,FILE_CSV) -> pd.DataFrame:
         
         
     df_out = pd.concat([df,df_partial], axis = 1)
-    print(df_out.columns)
-
-    if(os.path.exists("buffer.ps1")):
-        os.remove("buffer.ps1")
+    lg.debug(df_out.columns)
 
     return df_out
 
@@ -137,9 +133,6 @@ def add_results_single(df,df_partial,FILE_CSV) -> pd.DataFrame:
                 df_partial.to_csv(FILE_CSV, index=False)
 
     df_out = pd.concat([df,df_partial], axis = 1)
-
-    if(os.path.exists("buffer.ps1")):
-        os.remove("buffer.ps1")
 
     return df_out
 
@@ -255,6 +248,7 @@ if __name__ == '__main__':
     SCRIPT_MODE = args.SCRIPT_MODE
     OUT_FILE = args.OUT_FILE
     VERBOSE = args.v
+    N = 0
     
     if(VERBOSE):
         lg.getLogger().setLevel(lg.DEBUG)
@@ -262,8 +256,6 @@ if __name__ == '__main__':
     else:
         lg.getLogger().setLevel(lg.INFO)
 
-    N = 0
-    
     if(GROUND_TRUTH != ""):
         if((os.path.exists(OUT_FILE))):
             df_partial = pd.read_csv(OUT_FILE)
