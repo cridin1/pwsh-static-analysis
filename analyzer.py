@@ -5,7 +5,7 @@ from  math import pow
 from tqdm import tqdm
 import tempfile
 
-lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S')
+lg.basicConfig(format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', filename="app.log")
 tmp_csv_code = tempfile.NamedTemporaryFile(delete=False, dir=os.getcwd(), suffix=".csv")
 tmp_csv_truth = tempfile.NamedTemporaryFile(delete=False, dir=os.getcwd(), suffix=".csv")
 tmp_csv_code.close()
@@ -70,12 +70,11 @@ def parse_analysis(PS_PATH, PATH_CSV):
     lg.debug(df.columns)
     return df
 
-def str2list(string):
-    if(string == [''] or string == '' or string == ['']):
-        return []
-    else:
-        lg.debug(f"Splitting: {string}")
-        return string[1:-1].split(",")
+def str_to_list(s):
+    try:
+        return ast.literal_eval(s)
+    except (ValueError, SyntaxError):
+        return s
 
 def calculate_syntax_metric_single(df) -> float:
     l = df.shape[0]
@@ -84,20 +83,18 @@ def calculate_syntax_metric_single(df) -> float:
         
 
     for i,row in df.iterrows():
-        if(row['CODE']== "No code found"):
+        if(row['CODE']== "No code found" or row["CODE Rulename"] == ""):
             continue
         
-        if(type(row['CODE Rulename']) == str):
-            list_Rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Rulename'])]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Severity'])]
-        else:
-            list_Rulename = [elem.replace("'","").replace(" ","") for elem in row['CODE Rulename']]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in row['CODE Severity']]
-        
-        lg.debug(f"Answer single: {len(list_Rulename)} {len(list_severity)}")
+        lg.debug(f"{row['ScriptName']} {type(row['CODE Rulename'])} {list(row['CODE Rulename'])}")
 
+        list_Rulename = [elem.replace("'","").replace(" ","") for elem in row['CODE Rulename']]
+        list_severity = [elem.replace("'","").replace(" ","") for elem in row['CODE Severity']]
+        
         if(list_Rulename == [] or list_Rulename == ['']):
             continue
+        
+        lg.debug(f"Answer single: {len(list_Rulename)} {len(list_severity)}")
         
         list_a = list(zip(list_Rulename,list_severity))
         
@@ -105,13 +102,13 @@ def calculate_syntax_metric_single(df) -> float:
         for elem_a in list_a:
             if(elem_a[1] == "ParseError" and  elem_a[0] not in skip_error_rule):
                 list_a_filtered.append(elem_a)
-        
+
         for j,elem in enumerate(list_a_filtered):
             if(elem[1] == 'ParseError'):
                 count += 1
-                #lg.debug(f"Answer: {row} {i}")
                 break
-        
+    
+    lg.debug(f"Count valid ParseErrors: {count}/{l}")
     return round((1-count/l)*100,2), count, l
 
 def calculate_syntax_metric_double(df) -> float:
@@ -120,25 +117,16 @@ def calculate_syntax_metric_double(df) -> float:
     skip_error_rule = ['RedirectionNotSupported', "MissingFileSpecification"] #["The '<' operator is reserved for future use. "]
     
     for i,row in df.iterrows():
-        if(row['CODE']== "No code found"):
+        if(row['CODE']== "No code found" or row["CODE Rulename"] == ""):
             continue
+            
+        list_Rulename = [elem.replace("'","").replace(" ","") for elem in row['CODE Rulename']]
+        list_severity = [elem.replace("'","").replace(" ","") for elem in row['CODE Severity']]
 
-        if(type(row['CODE Rulename']) == str):
-            list_Rulename = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Rulename'])]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in str2list(row['CODE Severity'])]
-        else:
-            list_Rulename = [elem.replace("'","").replace(" ","") for elem in row['CODE Rulename']]
-            list_severity = [elem.replace("'","").replace(" ","") for elem in row['CODE Severity']]
+        list_Rulename_t = [elem.replace("'","").replace(" ","") for elem in row['TRUTH Rulename']]
+        list_severity_t = [elem.replace("'","").replace(" ","") for elem in row['TRUTH Severity']]
 
-        if(type(row['TRUTH Rulename']) == str):
-            list_Rulename_t = [elem.replace("'","").replace(" ","") for elem in str2list(row['TRUTH Rulename'])]
-            list_severity_t = [elem.replace("'","").replace(" ","") for elem in str2list(row['TRUTH Severity'])]
-        else:
-            list_Rulename_t = [elem.replace("'","").replace(" ","") for elem in row['TRUTH Rulename']]
-            list_severity_t = [elem.replace("'","").replace(" ","") for elem in row['TRUTH Severity']]
-
-
-        lg.debug(f"Answer double: {len(list_Rulename)} {list_severity} {len(list_Rulename_t)} {list_severity_t}")
+        lg.debug(f"{row['ScriptName']}  Answer double: {len(list_Rulename)} {list_severity} {len(list_Rulename_t)} {list_severity_t}")
 
         list_a = list(zip(list_Rulename, list_severity))
         list_b = list(zip(list_Rulename_t, list_severity_t))
@@ -164,7 +152,7 @@ def calculate_syntax_metric_double(df) -> float:
     return round((1-count/l)*100,2), count, l
 
 def check_if_psscriptanalyzer_installed():
-    result = subprocess.call("pwsh -command 'Get-Module -ListAvailable PSScriptAnalyzer'", shell=True)
+    result = subprocess.call("pwsh -command 'Get-Module -ListAvailable PSScriptAnalyzer'", shell=True, stdout=subprocess.DEVNULL)
     if(result == 0):
         return True
     else:
@@ -209,8 +197,7 @@ if __name__ == '__main__':
 
     if(GROUND_TRUTH != ""):
         if((os.path.exists(OUT_FILE))):
-            df = pd.read_csv(OUT_FILE)
-            df = df.fillna('')
+            df = pd.read_csv(OUT_FILE,  converters={"CODE Rulename": str_to_list, "CODE Severity": str_to_list, "TRUTH Rulename": str_to_list, "TRUTH Severity": str_to_list})
         else:
             df = extract_dataframe(PS_PATH,GROUND_TRUTH)
             df.to_csv(OUT_FILE)
@@ -231,13 +218,10 @@ if __name__ == '__main__':
             f.write(f"Count valid ParseErrors: {count2}/{l2}")
             f.write(f" Syntax metric double: {double_metric}\n")
         f.close()
-        
-
-        
+    
     else:
         if((os.path.exists(OUT_FILE))):
-            df = pd.read_csv(OUT_FILE)
-            df = df.fillna('')
+            df = pd.read_csv(OUT_FILE, delimiter=",")
         else:
             df = extract_dataframe(PS_PATH)
             df.to_csv(OUT_FILE, index=False)
